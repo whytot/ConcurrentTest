@@ -36,12 +36,12 @@ public class ConcurrentObservable2<T> {
     }
 
     /**
-     * 创建一个Observable，同时创建一个观察者注册到subject，并尝试跑work
+     * 创建一个Observable，同时缓存emitter，并尝试跑work
      */
     public Observable<T> getConcurrentObservable() {
         return Observable.create((ObservableEmitter<T> emitter) -> {
-            //注册观察者到subject
-            ConcurrentObservable2.this.subscribe(emitter);
+            //缓存emitter
+            subscribeEmitter(emitter);
             //跑work线程
             if (mIsWorking.compareAndSet(false, true)) {
                 doWork();
@@ -64,41 +64,38 @@ public class ConcurrentObservable2<T> {
         return getWorkObservable()
                 .subscribe(t -> {
                             synchronized (mIsWorking) {
-                                Iterator<Emitter<T>> i = emitters.listIterator();
-                                do {
-                                    Emitter<T> e = i.next();
+                                for (Emitter<T> e : emitters) {
                                     e.onNext(t);
-                                } while (i.hasNext());
+                                }
                             }
                         }
                         , throwable -> {
                             synchronized (mIsWorking) {
                                 Iterator<Emitter<T>> i = emitters.listIterator();
-                                do {
+                                while (i.hasNext()) {
                                     Emitter<T> e = i.next();
                                     e.onError(throwable);
                                     i.remove();
-                                } while (i.hasNext());
+                                }
                                 mIsWorking.set(false);
                             }
                         }
                         , () -> {
                             synchronized (mIsWorking) {
                                 Iterator<Emitter<T>> i = emitters.listIterator();
-                                do {
+                                while (i.hasNext()) {
                                     Emitter<T> e = i.next();
                                     e.onComplete();
                                     i.remove();
-                                } while (i.hasNext());
+                                }
                                 mIsWorking.set(false);
                             }
                         });
     }
 
-    private void subscribe(ObservableEmitter<T> emitter) {
+    private void subscribeEmitter(ObservableEmitter<T> emitter) {
         synchronized (mIsWorking) {
             emitters.add(emitter);
         }
     }
-
 }
