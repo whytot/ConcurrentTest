@@ -8,13 +8,15 @@ import java.util.concurrent.TimeUnit;
 
 import androidx.appcompat.app.AppCompatActivity;
 import io.reactivex.Observable;
+import io.reactivex.functions.Function;
+import io.reactivex.schedulers.Schedulers;
 
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "Main";
 
-    private ConcurrentObservable<String> mConcurrentObservable;
+    private ConcurrentObservable2<String> mConcurrentObservable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void testDelayMicrosecond() {
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 20; i++) {
             if (i % 3 == 0) {
                 sleep(TimeUnit.MICROSECONDS, 1);
             }
@@ -64,10 +66,15 @@ public class MainActivity extends AppCompatActivity {
     private void test(int i, TimeUnit timeUnit) {
         Log.e(TAG, "test: request - " + i);
         if (mConcurrentObservable == null) {
-            mConcurrentObservable = new ConcurrentObservable<>(Observable.just("aaa")
+            mConcurrentObservable = new ConcurrentObservable2<>(Observable.just("aaa")
                     .delay(2, timeUnit)
+                    .map(s -> {
+                        Log.e(TAG, "test: map - " + s);
+                        return s;
+                    })
                     .doOnSubscribe(disposable -> Log.e(TAG, "work: subscribe"))
-                    .doOnNext(s -> Log.e(TAG, "work: next - " + s)));
+                    .doOnNext(s -> Log.e(TAG, "work: next - " + s))
+                    .subscribeOn(Schedulers.io()));
         }
         mConcurrentObservable.getConcurrentObservable()
                 .subscribe(s -> Log.e(TAG, "test: next - " + i + "[" + s + "]"),
